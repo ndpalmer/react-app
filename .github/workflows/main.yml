@@ -11,6 +11,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Install dependencies
+        working-directory: ./client
         run: |
           npm install
           npm ci
@@ -41,11 +42,38 @@ jobs:
           install: true
           buildkitd-flags: --debug
       -
-        name: Build and push
+        name: Build and push client
         uses: docker/build-push-action@v2
         with:
-          context: ./
-          file: ./Dockerfile
+          context: ./client
+          file: Dockerfile
           builder: ${{ steps.buildx.outputs.name }}
           push: true
-          tags: ${{ secrets.DOCKER_HUB_USERNAME }}/frontend:latest
+          tags: ${{ secrets.DOCKER_HUB_USERNAME }}/multi-client
+      -
+        name: Build and push nginx
+        uses: docker/build-push-action@v2
+        with:
+          context: ./nginx
+          file: Dockerfile
+          builder: ${{ steps.buildx.outputs.name }}
+          push: true
+          tags: ${{ secrets.DOCKER_HUB_USERNAME }}/multi-nginx
+      -
+        name: Build and push client
+        uses: docker/build-push-action@v2
+        with:
+          context: ./server
+          file: Dockerfile
+          builder: ${{ steps.buildx.outputs.name }}
+          push: true
+          tags: ${{ secrets.DOCKER_HUB_USERNAME }}/multi-server
+      -
+        name: Build and push worker
+        uses: docker/build-push-action@v2
+        with:
+          context: ./worker
+          file: Dockerfile
+          builder: ${{ steps.buildx.outputs.name }}
+          push: true
+          tags: ${{ secrets.DOCKER_HUB_USERNAME }}/multi-worker
