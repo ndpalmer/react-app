@@ -16,6 +16,7 @@ jobs:
           npm install
           npm ci
       - name: Run tests
+        working-directory: ./client
         run: |
           npm run build
           npm run test
