@@ -11,14 +11,13 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Install dependencies
-        uses: ./client
         run: |
-          npm install
-          npm ci
+          ./client/npm install
+          ./client/npm ci
       - name: Run tests
         run: |
-          npm run build
-          npm run test
+          ./client/npm run build
+          ./client/npm run test
   build:
     runs-on: ubuntu-latest
     needs: test
