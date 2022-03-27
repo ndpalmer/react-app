@@ -1,0 +1,109 @@
+AWSTemplateFormatVersion: 2010-09-09
+Resources:
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: multi-docker-sg
+      GroupDescription: Allow traffic between multi-docker services
+  SecurityGroupIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    DependsOn: SecurityGroup
+    Properties:
+      GroupId: !GetAtt SecurityGroup.GroupId
+      IpProtocol: tcp
+      FromPort: 5432
+      ToPort: 6379
+      SourceSecurityGroupName: !Ref SecurityGroup
+  SecurityGroupEgress:
+    Type: AWS::EC2::SecurityGroupEgress
+    DependsOn: SecurityGroup
+    Properties:
+      GroupId: !GetAtt SecurityGroup.GroupId
+      IpProtocol: tcp
+      FromPort: 5432
+      ToPort: 6379
+      DestinationSecurityGroupId: !GetAtt SecurityGroup.GroupId
+  DBInstance:
+    Type: AWS::RDS::DBInstance
+    DependsOn: SecurityGroup
+    Properties:
+      DBInstanceIdentifier: 'multi-docker-db'
+      DBName: '{{resolve:secretsmanager:/multi-docker/DBA:SecretString:PGDATABASE}}'
+      DBInstanceClass: '{{resolve:ssm:/multi-docker/DBInstanceClass:1}}'
+      AllocatedStorage: 20
+      Engine: postgres
+      EngineVersion: 14.2
+      AvailabilityZone: '{{resolve:ssm:/multi-docker/DBAvailabilityZone:1}}'
+      VPCSecurityGroups:
+        - !GetAtt SecurityGroup.GroupId
+      PubliclyAccessible: false
+      Port: 5432
+      MasterUsername:   '{{resolve:secretsmanager:/multi-docker/DBA:SecretString:PGPASSWORD}}'
+      MasterUserPassword: '{{resolve:secretsmanager:/multi-docker/DBA:SecretString:PGUSER}}'
+  ElastiCache:
+    Type: AWS::ElastiCache::CacheCluster
+    DependsOn: SecurityGroup
+    Properties:
+      ClusterName: multi-docker-elasticache
+      NumCacheNodes: 1
+      Port: 6379
+      CacheNodeType: '{{resolve:ssm:/multi-docker/CacheNodeType:1}}'
+      Engine: redis
+      EngineVersion: 6.2
+      PreferredAvailabilityZone: '{{resolve:ssm:/multi-docker/DBAvailabilityZone:1}}'
+      VpcSecurityGroupIds:
+        - !GetAtt SecurityGroup.GroupId
+  EBSEnvironment:
+    Type: AWS::ElasticBeanstalk::Environment
+    DependsOn:
+      - SecurityGroup
+      - ElastiCache
+      - DBInstance
+    Properties:
+      ApplicationName: multi-docker
+      EnvironmentName: multi-docker-ebs
+      PlatformArn: 'arn:aws:elasticbeanstalk:ap-southeast-2::platform/ECS running on 64bit Amazon Linux 2/3.0.0'
+      Tier: 
+        Name: WebServer
+        Type: Standard
+      OptionSettings:
+        -
+          Namespace: aws:autoscaling:launchconfiguration
+          OptionName: "SecurityGroups"
+          Value: !Ref SecurityGroup
+        -
+          Namespace: aws:autoscaling:launchconfiguration
+          OptionName: IamInstanceProfile
+          Value: aws-elasticbeanstalk-ec2-role
+        -
+          Namespace: aws:elasticbeanstalk:environment
+          OptionName: ServiceRole
+          Value: aws-elasticbeanstalk-service-role
+        -
+          Namespace: aws:elasticbeanstalk:application:environment
+          OptionName: REDIS_HOST
+          Value: !GetAtt ElastiCache.RedisEndpoint.Address
+        -
+          Namespace: aws:elasticbeanstalk:application:environment
+          OptionName: REDIS_PORT
+          Value: !GetAtt ElastiCache.RedisEndpoint.Port
+        -
+          Namespace: aws:elasticbeanstalk:application:environment
+          OptionName: PGHOST
+          Value: !GetAtt DBInstance.Endpoint.Address
+        -
+          Namespace: aws:elasticbeanstalk:application:environment
+          OptionName: PGDATABASE
+          Value: '{{resolve:secretsmanager:/multi-docker/DBA:SecretString:PGDATABASE}}'
+        -
+          Namespace: aws:elasticbeanstalk:application:environment
+          OptionName: PGPORT
+          Value: !GetAtt DBInstance.Endpoint.Port
+        -
+          Namespace: aws:elasticbeanstalk:application:environment
+          OptionName: PGUSER
+          Value: '{{resolve:secretsmanager:/multi-docker/DBA:SecretString:PGUSER}}'
+        -
+          Namespace: aws:elasticbeanstalk:application:environment
+          OptionName: PGPASSWORD
+          Value: '{{resolve:secretsmanager:/multi-docker/DBA:SecretString:PGPASSWORD}}'
