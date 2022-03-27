@@ -27,7 +27,7 @@ Resources:
     Type: AWS::RDS::DBInstance
     DependsOn: SecurityGroup
     Properties:
-      DBInstanceIdentifier: 'multi-docker-db'
+      DBInstanceIdentifier: multi-docker-db
       DBName: '{{resolve:secretsmanager:/multi-docker/DBA:SecretString:PGDATABASE}}'
       DBInstanceClass: '{{resolve:ssm:/multi-docker/DBInstanceClass:1}}'
       AllocatedStorage: 20
@@ -69,7 +69,7 @@ Resources:
       OptionSettings:
         -
           Namespace: aws:autoscaling:launchconfiguration
-          OptionName: "SecurityGroups"
+          OptionName: SecurityGroups
           Value: !Ref SecurityGroup
         -
           Namespace: aws:autoscaling:launchconfiguration
